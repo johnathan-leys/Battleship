@@ -1,0 +1,1 @@
+Battleship C is mostly working. It does not print hits/misses of opponents board, which we should probably add. Might be difficult due to "stacking" of ships/hits/misses.
