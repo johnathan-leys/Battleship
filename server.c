@@ -24,6 +24,8 @@
 void placeShips(char grid[][GRID_SIZE], int player);
 void initGrid(char grid[][GRID_SIZE]);
 void printGrid(char grid[][GRID_SIZE]);
+int checkHit(char grid[][GRID_SIZE], int row, int col, int player);
+int gameOver(char grid[][GRID_SIZE], int player);
 
 int main(int argc, char **argv) {
 
@@ -130,6 +132,8 @@ int main(int argc, char **argv) {
 	
 	while(gameFinished!=1){
 
+		// Player 1 goes first: get their input,use tha regular battleship functions, print state.
+		// then send/read from player 2, receive their input, do calculations, update state. Check gameover, loop again.
 
 		/* Someone connected!  Let's try to read BUFFER_SIZE-1 bytes */
 		memset(buffer,0,BUFFER_SIZE);
@@ -242,4 +246,45 @@ void printGrid(char grid[][GRID_SIZE]) {
         }
         printf("\n");
     }
+}
+
+int checkHit(char grid[][GRID_SIZE], int row, int col, int player) {
+    if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {
+        return 0;
+    }
+
+    if (grid[row][col] == 'S') {
+        grid[row][col] = 'X';
+        int shipSunk = 1;
+
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                if (grid[i][j] == 'S') {
+                    shipSunk = 0;
+                    break;
+                }
+            }
+            if (!shipSunk) {
+                break;
+            }
+        }
+
+        return shipSunk ? 2 : 1;
+    } else if (grid[row][col] == '-') {
+        grid[row][col] = 'O';
+        return 0;
+    } else {
+        return 0;
+    }
+}
+
+int gameOver(char grid[][GRID_SIZE], int player) {
+    for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+            if (grid[i][j] == 'S') {
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
