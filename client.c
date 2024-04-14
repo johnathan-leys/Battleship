@@ -19,6 +19,13 @@
 /* Default hostname */
 #define DEFAULT_HOSTNAME	"localhost"
 
+// Battleship setup
+#define GRID_SIZE 10
+
+void placeShips(char grid[][GRID_SIZE], int player);
+void initGrid(char grid[][GRID_SIZE]);
+void printGrid(char grid[][GRID_SIZE]);
+
 int socket_fd;
 
 // Signal handler function, to handle unexpected closing
@@ -91,7 +98,40 @@ int main(int argc, char **argv) {
 			strerror(errno));
 	}
 
+	// Set up battleship stuff
+	char player2Grid[GRID_SIZE][GRID_SIZE];
+	char singleDimGrid[GRID_SIZE * GRID_SIZE];
 
+	initGrid(player2Grid);
+	placeShips(player2Grid, 2);
+	printGrid(player2Grid);
+	// From here, grid is set. Convert to 1d buffer, sent via network.
+	memcpy(singleDimGrid, player2Grid, sizeof(char) * GRID_SIZE * GRID_SIZE);
+
+	printf("Sending Grid to server: ");
+
+	memset(buffer,0,BUFFER_SIZE);
+	fgets(buffer,BUFFER_SIZE-1,stdin);
+
+	n = write(socket_fd,singleDimGrid,strlen(singleDimGrid));
+		if (n<0) {
+			fprintf(stderr,"Error writing socket! %s\n",
+				strerror(errno));
+		}
+
+
+	/*
+	In the loop, we want to :
+	Get whos turn it is:
+	if player2 use fgets to ask player for coordinates as astring:
+	Send that string to the server
+	Server does logic for checking
+	Server sends hit or miss message
+	Print hit or miss message
+	Server send grid state back to client
+	Other players turn, indicate that, print their results
+	
+	*/
 	/****************************************/
 	/* Main client loop 			*/
 	/****************************************/
@@ -134,4 +174,75 @@ int main(int argc, char **argv) {
 	close(socket_fd);
 
 	return 0;
+}
+
+void placeShips(char grid[][GRID_SIZE], int player) {
+    int numShips, shipLength, row, col, direction;
+
+    printf("\nPlayer %d, place your ships:\n", player);
+
+    for (numShips = 0; numShips < 5; numShips++) {
+        printf("Ship %d (length %d):\n", numShips + 1, numShips + 2);
+
+        do {
+            printf("Enter row and column for start: ");
+            scanf("%d %d", &row, &col);
+            printf("Enter direction (0 for horizontal, 1 for vertical): ");
+            scanf("%d", &direction);
+
+            if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {
+                printf("Invalid coordinates. Try again.\n");
+                continue;
+            }
+
+            shipLength = numShips + 2;
+            int valid = 1;
+
+            for (int i = 0; i < shipLength; i++) {
+                int r = direction ? row + i : row;
+                int c = direction ? col : col + i;
+
+                if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE || grid[r][c] != '-') {
+                    valid = 0;
+                    break;
+                }
+            }
+
+            if (valid) {
+                for (int i = 0; i < shipLength; i++) {
+                    int r = direction ? row + i : row;
+                    int c = direction ? col : col + i;
+                    grid[r][c] = 'S';
+                }
+                break;
+            } else {
+                printf("Invalid placement. Try again.\n");
+            }
+        } while (1);
+    }
+}
+
+
+void initGrid(char grid[][GRID_SIZE]) {
+    for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+            grid[i][j] = '-';
+        }
+    }
+}
+
+void printGrid(char grid[][GRID_SIZE]) {
+    printf("   ");
+    for (int i = 0; i < GRID_SIZE; i++) {
+        printf("%d ", i);
+    }
+    printf("\n");
+
+    for (int i = 0; i < GRID_SIZE; i++) {
+        printf("%d  ", i);
+        for (int j = 0; j < GRID_SIZE; j++) {
+            printf("%c ", grid[i][j]);
+        }
+        printf("\n");
+    }
 }

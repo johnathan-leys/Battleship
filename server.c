@@ -19,6 +19,12 @@
 /* Default port to listen on */
 #define DEFAULT_PORT	31337
 
+#define GRID_SIZE 10
+
+void placeShips(char grid[][GRID_SIZE], int player);
+void initGrid(char grid[][GRID_SIZE]);
+void printGrid(char grid[][GRID_SIZE]);
+
 int main(int argc, char **argv) {
 
 	int socket_fd,new_socket_fd;
@@ -88,7 +94,43 @@ int main(int argc, char **argv) {
        inet_ntoa(client_addr.sin_addr),	//  use inet_ntop to convert from binary to string for printing
        ntohs(client_addr.sin_port));	//  "network to host short" converts port number from network order to host- little endian
 
-	while(1){
+	// Set up Battlehip before while loop
+	char player1Grid[GRID_SIZE][GRID_SIZE];
+    char player2Grid[GRID_SIZE][GRID_SIZE];
+
+	initGrid(player1Grid);	// Init empty grids
+	initGrid(player2Grid);
+	 
+	placeShips(player1Grid, 1);
+	// We want to change player 2 to get placeships info from buffer- should be ok
+								// to just copy the first memset/message receive code from loop
+	
+	// Ideally we block here until receive grid setup from player2
+
+	int currentPlayer = 1;
+    int gameFinished = 0;
+
+	// Get the player 2 grid from client
+	memset(buffer,0,BUFFER_SIZE);
+	n = read(new_socket_fd,buffer,(BUFFER_SIZE-1));
+	if (n==0) {
+			fprintf(stderr,"Connection to client lost (Grid getting)\n\n");
+	}
+	else if (n<0) {
+		fprintf(stderr,"Error reading from socket (Grid getting) %s\n",
+			strerror(errno));
+	}
+	memcpy(player2Grid, buffer, sizeof(char) * GRID_SIZE * GRID_SIZE);
+	// End grid getting
+
+	/* Print the message we received */
+	printf("Grid from client (DO NOT KEEP IN FINAL): \n");
+	printGrid(player2Grid);				// This is cheating, get rid of when done testing...
+
+	
+	while(gameFinished!=1){
+
+
 		/* Someone connected!  Let's try to read BUFFER_SIZE-1 bytes */
 		memset(buffer,0,BUFFER_SIZE);
 		n = read(new_socket_fd,buffer,(BUFFER_SIZE-1));
@@ -128,4 +170,76 @@ int main(int argc, char **argv) {
 	close(new_socket_fd);
 	close(socket_fd);
 	return 0;
+}
+
+
+void placeShips(char grid[][GRID_SIZE], int player) {
+    int numShips, shipLength, row, col, direction;
+
+    printf("\nPlayer %d, place your ships:\n", player);
+
+    for (numShips = 0; numShips < 5; numShips++) {
+        printf("Ship %d (length %d):\n", numShips + 1, numShips + 2);
+
+        do {
+            printf("Enter row and column for start: ");
+            scanf("%d %d", &row, &col);
+            printf("Enter direction (0 for horizontal, 1 for vertical): ");
+            scanf("%d", &direction);
+
+            if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {
+                printf("Invalid coordinates. Try again.\n");
+                continue;
+            }
+
+            shipLength = numShips + 2;
+            int valid = 1;
+
+            for (int i = 0; i < shipLength; i++) {
+                int r = direction ? row + i : row;
+                int c = direction ? col : col + i;
+
+                if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE || grid[r][c] != '-') {
+                    valid = 0;
+                    break;
+                }
+            }
+
+            if (valid) {
+                for (int i = 0; i < shipLength; i++) {
+                    int r = direction ? row + i : row;
+                    int c = direction ? col : col + i;
+                    grid[r][c] = 'S';
+                }
+                break;
+            } else {
+                printf("Invalid placement. Try again.\n");
+            }
+        } while (1);
+    }
+}
+
+
+void initGrid(char grid[][GRID_SIZE]) {
+    for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+            grid[i][j] = '-';
+        }
+    }
+}
+
+void printGrid(char grid[][GRID_SIZE]) {
+    printf("   ");
+    for (int i = 0; i < GRID_SIZE; i++) {
+        printf("%d ", i);
+    }
+    printf("\n");
+
+    for (int i = 0; i < GRID_SIZE; i++) {
+        printf("%d  ", i);
+        for (int j = 0; j < GRID_SIZE; j++) {
+            printf("%c ", grid[i][j]);
+        }
+        printf("\n");
+    }
 }
