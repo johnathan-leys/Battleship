@@ -173,6 +173,7 @@ int main(int argc, char **argv) {
 		}
 
 		// At end, check if game is over and transmit that to P1
+		// Everything else in this loops is old- remove when done
 
 		/* Someone connected!  Let's try to read BUFFER_SIZE-1 bytes */
 		memset(buffer,0,BUFFER_SIZE);

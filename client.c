@@ -159,6 +159,8 @@ int main(int argc, char **argv) {
 			// Either receive updated board through buffer or manually update board here
 		}
 
+		// Everything else in this loops is old- remove when done
+		
 		/* Prompt for a message */
 		printf("Please enter a message to send: ");
 
