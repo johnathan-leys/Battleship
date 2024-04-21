@@ -124,9 +124,7 @@ int main(int argc, char **argv) {
 	memcpy(player2Grid, buffer, sizeof(char) * GRID_SIZE * GRID_SIZE);
 	// End grid getting
 
-	/* Print the message we received */
-	printf("Grid from client (DO NOT KEEP IN FINAL): \n");
-	printGrid(player2Grid);				// This is cheating, get rid of when done testing...
+
 
 	
 	while(gameFinished!=1){
