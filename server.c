@@ -1,4 +1,3 @@
-/* ECE435 Homework #1 socket server code */
 
 #include <stdio.h>
 #include <unistd.h>
@@ -24,18 +23,19 @@
 void placeShips(char grid[][GRID_SIZE], int player);
 void initGrid(char grid[][GRID_SIZE]);
 void printGrid(char grid[][GRID_SIZE]);
-int checkHit(char grid[][GRID_SIZE], int row, int col, int player);
-int gameOver(char grid[][GRID_SIZE], int player);
+int checkHit(char grid[][GRID_SIZE], int row, int col);
+int gameOver(char grid[][GRID_SIZE]);
 
 int main(int argc, char **argv) {
 
 	int socket_fd,new_socket_fd;
 	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;			// changed from sockaddr for something cool
+	struct sockaddr_in client_addr;	
 	int port=DEFAULT_PORT;
 	int n,on=1;
 	socklen_t client_len;
 	char buffer[BUFFER_SIZE];
+	int intBuffer[2];
 
 	int result;
 
@@ -87,11 +87,6 @@ int main(int argc, char **argv) {
 	}
 							//  "network to host short" converts port number from network order to host- little endian
 
-	/* 
-	SOMETHING COOL: Print client address and port
-	This was more difficult to do until i without changing the type of client_addr from sockaddr to sockaddr_in.
-	Before that, I tried importing some stuff and typecasting.
-	*/
 	printf("Client connected from %s:%d\n",
        inet_ntoa(client_addr.sin_addr),	//  use inet_ntop to convert from binary to string for printing
        ntohs(client_addr.sin_port));	//  "network to host short" converts port number from network order to host- little endian
@@ -105,12 +100,16 @@ int main(int argc, char **argv) {
 	 
 	placeShips(player1Grid, 1);
 	// We want to change player 2 to get placeships info from buffer- should be ok
-								// to just copy the first memset/message receive code from loop
+	// to just copy the first memset/message receive code from loop
+	printf("Your board: \n");
+	printGrid(player1Grid);
 	
-	// Ideally we block here until receive grid setup from player2
 
 	int currentPlayer = 1;
     int gameFinished = 0;
+	int row = 1;
+	int col = 1;
+	int hit =0;
 
 	// Get the player 2 grid from client
 	memset(buffer,0,BUFFER_SIZE);
@@ -132,40 +131,80 @@ int main(int argc, char **argv) {
 	
 	while(gameFinished!=1){
 
-		// Player 1 goes first: get their input,use tha regular battleship functions, print state.
+		// Player 1 goes first: get their input, use the regular battleship functions, print state.
 		// then send/read from player 2, receive their input, do calculations, update state. Check gameover, loop again.
 
-		/* Someone connected!  Let's try to read BUFFER_SIZE-1 bytes */
-		memset(buffer,0,BUFFER_SIZE);
-		n = read(new_socket_fd,buffer,(BUFFER_SIZE-1));
-		if (n==0) {
-			fprintf(stderr,"Connection to client lost\n\n");
+		if(currentPlayer == 1){
+			printf("---------------------------------------\n");
+			printf("Your turn!\n");
+			
+        	printf("Enter row and column to fire: ");
+        	scanf("%d %d", &row, &col);
+			hit = checkHit(player2Grid, row, col);
+
+			if (hit == 1) {
+            printf("Hit!\n");
+			strcpy(buffer, "Player1 scored a Hit!   ");
+			} else if (hit == 2) {
+				printf("Ship sunk!              \n");
+				strcpy(buffer, "Player 1 sunk your ship!");
+			} else {
+				printf("Miss!\n");
+				strcpy(buffer, "Player1 missed!         ");
+			}
+			//printGrid(player2Grid);
+			// Game over check on player 2 board if player is p1, else on player1board
+			gameFinished = gameOver(currentPlayer == 1 ? player2Grid : player1Grid);
+			currentPlayer = currentPlayer == 1 ? 2 : 1; // Switch current player
+
+			//memset(buffer, '\0', sizeof(buffer));
+			n = write(new_socket_fd, buffer, strlen(buffer)); 
+			if (n<0) {
+				fprintf(stderr,"Error writing. %s\n",
+					strerror(errno));
+			}
+
+
 		}
-		else if (n<0) {
-			fprintf(stderr,"Error reading from socket %s\n",
-				strerror(errno));
+		else{	// Player 2 turn- need to do networking
+			printf("---------------------------------------\n");
+			printf("Player 2 turn- getting their move...\n");
+			memset(buffer,0,BUFFER_SIZE);
+			n = read(new_socket_fd,intBuffer,sizeof(intBuffer));
+			if (n==0) {
+				fprintf(stderr,"Connection to client lost\n\n");
+			}
+			else if (n<0) {
+				fprintf(stderr,"Error reading from socket %s\n",
+					strerror(errno));
+			}
+			printf("Guess received: %d %d\n", intBuffer[0], intBuffer[1]);
+			hit = checkHit(player1Grid, intBuffer[0], intBuffer[1]);
+			if (hit == 1) {
+            printf("Player 2 scored a Hit!\n");
+			strcpy(buffer, "You scored a Hit!");
+			} else if (hit == 2) {
+				printf("Your Ship sunk!\n");
+				strcpy(buffer, "You sunk P1 ship!");
+			} else {
+				printf("Player 2 Missed!\n");
+				strcpy(buffer, "You missed!");
+			}
+
+			n = write(new_socket_fd, buffer, strlen(buffer));  
+			if (n<0) {
+				fprintf(stderr,"Error writing. %s\n",
+					strerror(errno));
+			}
+			gameFinished = gameOver(currentPlayer == 2 ? player1Grid : player2Grid);
+			currentPlayer = 1; // Switch current player
+		}
+		if(gameFinished == 1){
+			printf("Game Over: Player %d wins!\n", currentPlayer == 1 ? 2 : 1);
+			break;
 		}
 
-		/* Print the message we received */
-		printf("Message from client: %s\n",buffer);
-
-		for (int i = 0; i < n; i++) {
-            buffer[i] = toupper(buffer[i]);
-        }
-		/* Send a response */
-		n = write(new_socket_fd, buffer, strlen(buffer));  //  Updated to echo back the message: use strlen rather than constant to avoid sending entire buffer or truncating
-		if (n<0) {
-			fprintf(stderr,"Error writing. %s\n",
-				strerror(errno));
-		}	
-
-		if(strncmp(buffer, "BYE\n", 4) == 0){ //  check for exit command
-			printf("Termination string received: Exiting server\n\n");
-			/* Close the sockets */
-			close(new_socket_fd);
-			close(socket_fd);
-			return 0;
-		}
+		
 
 	}
 
@@ -248,7 +287,7 @@ void printGrid(char grid[][GRID_SIZE]) {
     }
 }
 
-int checkHit(char grid[][GRID_SIZE], int row, int col, int player) {
+int checkHit(char grid[][GRID_SIZE], int row, int col) {
     if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {
         return 0;
     }
@@ -278,7 +317,7 @@ int checkHit(char grid[][GRID_SIZE], int row, int col, int player) {
     }
 }
 
-int gameOver(char grid[][GRID_SIZE], int player) {
+int gameOver(char grid[][GRID_SIZE]) {
     for (int i = 0; i < GRID_SIZE; i++) {
         for (int j = 0; j < GRID_SIZE; j++) {
             if (grid[i][j] == 'S') {

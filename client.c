@@ -1,4 +1,3 @@
-/* ECE435 Homework #1 Socket Client Code */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +31,7 @@ int socket_fd;
 void sigint_handler(int signo) {
     if (signo == SIGINT) {
         // Send "bye" message to the server before exiting
-        write(socket_fd, "bye", strlen("bye"));
+        //write(socket_fd, "bye", strlen("bye"));
         printf("\nInterrupt. Closing...\n");
         close(socket_fd);
         exit(0);
@@ -48,6 +47,7 @@ int main(int argc, char **argv) {
 	char buffer[BUFFER_SIZE];
 	int n;
 	int result;
+	int intBuffer[2];
 
 	// Signal handler for SIGINT to handle unexpected disconnect w/ ctr+c
     signal(SIGINT, sigint_handler);
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
 	// From here, grid is set. Convert to 1d buffer, sent via network.
 	memcpy(singleDimGrid, player2Grid, sizeof(char) * GRID_SIZE * GRID_SIZE);
 
-	printf("Sending Grid to server: ");
+	printf("Sending Grid to server: \n");
 
 	memset(buffer,0,BUFFER_SIZE);
 	fgets(buffer,BUFFER_SIZE-1,stdin);
@@ -118,57 +118,56 @@ int main(int argc, char **argv) {
 			fprintf(stderr,"Error writing socket! %s\n",
 				strerror(errno));
 		}
+	int currentPlayer = 1;
+    int gameFinished = 0;
+	int row = 1;
+	int col = 1;
 
-
-	/*
-	In the loop, we want to :
-	Get whos turn it is:
-	if player2 use fgets to ask player for coordinates as astring:
-	Send that string to the server
-	Server does logic for checking
-	Server sends hit or miss message
-	Print hit or miss message
-	Server send grid state back to client
-	Other players turn, indicate that, print their results
-	
-	*/
-	/****************************************/
-	/* Main client loop 			*/
-	/****************************************/
 	while(1){
 
-		/* Prompt for a message */
-		printf("Please enter a message to send: ");
+		if(currentPlayer == 1){
+			printf("---------------------------------------\n");
+			printf("Player 1 turn\n");
+			/* Clear buffer and read the response from the server */
+			memset(buffer,0,BUFFER_SIZE);
+			n = read(socket_fd,buffer,BUFFER_SIZE-1);
+			if (n<0) {
+				fprintf(stderr,"Error reading socket! %s\n",
+					strerror(errno));
+			}
+			printf("Player 1 results:\n");
+			printf("%s\n\n",buffer);
+			
+			currentPlayer = currentPlayer == 1 ? 2 : 1; // Switch current player
 
-		/* Read NUL terminated string from standard input */
-		/* (your keyboard most likely) */
-		memset(buffer,0,BUFFER_SIZE);
-		fgets(buffer,BUFFER_SIZE-1,stdin);
-
-		/* Write to socket using the "write" system call */
-		n = write(socket_fd,buffer,strlen(buffer));
-		if (n<0) {
-			fprintf(stderr,"Error writing socket! %s\n",
-				strerror(errno));
 		}
+		else{
+			printf("---------------------------------------\n");
+			memset(buffer,0,BUFFER_SIZE);
+			printf("Your turn! (player2)\n");
+			printf("Enter row and column to fire!\n");
+			scanf("%d %d", &row, &col);
+			intBuffer[0] = row;
+			intBuffer[1] = col;
 
-		/* Clear buffer and read the response from the server */
-		memset(buffer,0,BUFFER_SIZE);
-		n = read(socket_fd,buffer,BUFFER_SIZE-1);
-		if (n<0) {
-			fprintf(stderr,"Error reading socket! %s\n",
-				strerror(errno));
-		}
+			n = write(socket_fd, intBuffer, sizeof(intBuffer));
+			if (n<0) {
+				fprintf(stderr,"Error writing socket! %s\n",
+					strerror(errno));
+			}
 
-		/* Print the response we got */
-		printf("Received back from server: %s\n\n",buffer);
-		if(strncmp(buffer, "BYE\n", 4) == 0){ //  check for exit command
-			printf("Termination string detected, closing...\n");
-			close(socket_fd);
-			printf("Closed\n");
-			return 0;
-			//break;
+			memset(buffer,0,BUFFER_SIZE);
+			n = read(socket_fd,buffer,BUFFER_SIZE-1);
+			if (n<0) {
+				fprintf(stderr,"Error reading socket! %s\n",
+					strerror(errno));
+			}
+			printf("Your results:\n");
+			printf("%s\n\n",buffer);
+			currentPlayer = 1;
+			
 		}
+		
 	}
 	/* All finished, close the socket/file descriptor */
 	close(socket_fd);
